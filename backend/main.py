@@ -12,6 +12,14 @@ from dotenv import load_dotenv
 from google import genai
 
 app = FastAPI()
+from fastapi.middleware.cors import CORSMiddleware
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 load_dotenv()
 
 client = genai.Client(
@@ -43,7 +51,13 @@ class ChatRequest(BaseModel):
 def home():
     return {"message": "LLM Cache Proxy is running!"}
 
+@app.get("/stats")
+def stats():
+    total_cached = cache_collection.count_documents({})
 
+    return {
+        "total_cached": total_cached
+    }
 @app.post("/chat")
 def chat(request: ChatRequest):
 
@@ -55,8 +69,9 @@ def chat(request: ChatRequest):
     if cached:
         return {
             "answer": cached["answer"],
-            "cached": True
-        }
+            "cached": True,
+            "source": "exact_cache"
+}
     # Convert question into embedding
     vector = model.encode(request.question).tolist()
     results = qdrant.query_points(
@@ -82,7 +97,8 @@ def chat(request: ChatRequest):
             if cached:
                 return {
                     "answer": cached["answer"],
-                    "cached": True
+                    "cached": True,
+                    "source": "semantic_cache"
                 }
     print("Embedding created!")
     print("Vector length:", len(vector))
@@ -101,12 +117,7 @@ def chat(request: ChatRequest):
 )
 
     # Temporary answer
-    response = client.models.generate_content(
-    model="gemini-3.8-flash",
-    contents=request.question
-    )
-
-    answer = response.text
+    answer = "Test answer from FastAPI"
 
     # Save in MongoDB
     cache_collection.insert_one({
@@ -115,6 +126,7 @@ def chat(request: ChatRequest):
     })
 
     return {
-        "answer": answer,
-        "cached": False
-    }
+    "answer": answer,
+    "cached": False,
+    "source": "ai"
+}
