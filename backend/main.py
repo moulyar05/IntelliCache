@@ -117,7 +117,12 @@ def chat(request: ChatRequest):
 )
 
     # Temporary answer
-    answer = "Test answer from FastAPI"
+    response = client.models.generate_content(
+    model="gemini-3.5-flash-lite",
+    contents=request.question
+)
+
+    answer = response.text
 
     # Save in MongoDB
     cache_collection.insert_one({
